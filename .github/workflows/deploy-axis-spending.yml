@@ -1,0 +1,47 @@
+name: Deploy Axis Spending
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "axis-spending/axis_tracker.py"
+      - "axis-spending/SKILL.md"
+      - ".github/workflows/deploy-axis-spending.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare server directories
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /home/zain/zainclaw/axis_spending
+            mkdir -p /home/zain/zainclaw/axis_spending/data
+            mkdir -p /home/zain/zainclaw/axis_spending/dashboard
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "axis-spending/axis_tracker.py,axis-spending/SKILL.md"
+          target: "/home/zain/zainclaw/axis_spending"
+          strip_components: 1
+
+      - name: Verify deployed tracker
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            python3 -m py_compile /home/zain/zainclaw/axis_spending/axis_tracker.py
