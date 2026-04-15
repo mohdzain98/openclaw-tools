@@ -306,21 +306,32 @@ def build_source_id(env_id, tx_date, amount, tx_type, particulars, account):
 def get_fetch_plan(conn, days):
     now = datetime.now()
     requested_start = now - timedelta(days=days)
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     stats = conn.execute(
         """
         SELECT
             MIN(CASE WHEN tx_date >= ? THEN tx_date END) AS min_in_window,
+            MIN(CASE WHEN tx_date >= ? THEN tx_date END) AS min_in_current_month,
             MAX(CASE WHEN tx_date >= ? THEN tx_date END) AS max_in_window,
             MAX(tx_date) AS latest_overall
         FROM transactions
         """,
-        (requested_start.isoformat(), requested_start.isoformat()),
+        (
+            requested_start.isoformat(),
+            current_month_start.isoformat(),
+            requested_start.isoformat(),
+        ),
     ).fetchone()
 
     min_in_window = (
         datetime.fromisoformat(stats["min_in_window"])
         if stats["min_in_window"]
+        else None
+    )
+    min_in_current_month = (
+        datetime.fromisoformat(stats["min_in_current_month"])
+        if stats["min_in_current_month"]
         else None
     )
     latest_overall = (
@@ -329,7 +340,13 @@ def get_fetch_plan(conn, days):
         else None
     )
 
-    if min_in_window is None:
+    if min_in_current_month is None:
+        fetch_cutoff = current_month_start
+        reason = "no_db_rows_for_current_month"
+    elif min_in_current_month > current_month_start + timedelta(minutes=1):
+        fetch_cutoff = current_month_start
+        reason = "backfill_current_month_start"
+    elif min_in_window is None:
         fetch_cutoff = requested_start
         reason = "no_db_rows_for_requested_window"
     elif min_in_window > requested_start + timedelta(minutes=1):
@@ -343,11 +360,9 @@ def get_fetch_plan(conn, days):
         fetch_cutoff = requested_start
         reason = "fallback_requested_window"
 
-    if fetch_cutoff < requested_start:
-        fetch_cutoff = requested_start
-
     return {
         "requested_start": requested_start,
+        "current_month_start": current_month_start,
         "fetch_cutoff": fetch_cutoff,
         "reason": reason,
     }
@@ -355,9 +370,20 @@ def get_fetch_plan(conn, days):
 
 def describe_fetch_plan(plan):
     requested_start = plan["requested_start"].strftime("%d %b %Y %H:%M")
+    current_month_start = plan["current_month_start"].strftime("%d %b %Y %H:%M")
     fetch_cutoff = plan["fetch_cutoff"].strftime("%d %b %Y %H:%M")
     reason = plan["reason"]
 
+    if reason == "no_db_rows_for_current_month":
+        return (
+            f"ℹ️  DB has no rows for the current month. "
+            f"Backfilling from {current_month_start}."
+        )
+    if reason == "backfill_current_month_start":
+        return (
+            f"ℹ️  Current month page is incomplete. "
+            f"Backfilling from {current_month_start}."
+        )
     if reason == "no_db_rows_for_requested_window":
         return (
             f"ℹ️  DB has no rows for the requested window. "
