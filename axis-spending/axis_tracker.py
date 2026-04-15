@@ -51,6 +51,7 @@ WHATSAPP_ENABLED = os.environ.get("OPENCLAW_WHATSAPP_ENABLED", "true").lower() i
     "on",
 }
 DEFAULT_FETCH_DAYS = int(os.environ.get("AXIS_DEFAULT_FETCH_DAYS", "7"))
+LATEST_DASHBOARD_DAYS = int(os.environ.get("AXIS_LATEST_DASHBOARD_DAYS", "7"))
 
 CATEGORY_RULES = {
     "emi": [r"\bemi\b", r"\bcred\b", r"cred club", r"loan"],
@@ -1222,18 +1223,18 @@ _{period_label}_
 
 def build_dashboards(conn, days):
     now = datetime.now()
-    week_start = now - timedelta(days=days)
-    week_label = f"{week_start.strftime('%d %b')} – {now.strftime('%d %b %Y')}"
+    latest_start = now - timedelta(days=LATEST_DASHBOARD_DAYS)
+    latest_label = f"{latest_start.strftime('%d %b')} – {now.strftime('%d %b %Y')}"
 
     month_keys = list_month_keys(conn)
     nav_links = build_nav_links(month_keys)
 
-    weekly_transactions = load_transactions_between(conn, start_dt=week_start)
-    weekly_summary = compute_summary(weekly_transactions)
+    latest_transactions = load_transactions_between(conn, start_dt=latest_start)
+    latest_summary = compute_summary(latest_transactions)
     latest_html = generate_dashboard(
-        weekly_summary,
-        week_label,
-        f"Spending — {week_label}",
+        latest_summary,
+        latest_label,
+        f"Spending — {latest_label}",
         nav_links,
     )
     latest_url = save_dashboard(latest_html, "latest.html")
@@ -1279,7 +1280,7 @@ def build_dashboards(conn, days):
     archive_html = generate_archive_page(month_keys, nav_links)
     save_dashboard(archive_html, "archive.html")
 
-    return weekly_summary, latest_url, week_label
+    return latest_summary, latest_url, latest_label
 
 
 def main(days=7):
