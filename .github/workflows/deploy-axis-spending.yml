@@ -8,8 +8,6 @@ on:
       - "axis-spending/axis_tracker.py"
       - "axis-spending/SKILL.md"
       - ".github/workflows/deploy-axis-spending.yml"
-    paths-ignore:
-      - "README.md"
 
 jobs:
   deploy:
