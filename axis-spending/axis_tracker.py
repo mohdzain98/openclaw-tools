@@ -41,9 +41,7 @@ DASHBOARD_URL = os.environ.get(
     "DASHBOARD_URL", "https://claw.mohdzain.com/spending"
 ).rstrip("/")
 DATA_DIR = Path(os.environ.get("AXIS_DATA_DIR", str(BASE_DIR / "data")))
-DASHBOARD_DIR = Path(
-    os.environ.get("AXIS_DASHBOARD_DIR", str(BASE_DIR / "dashboard"))
-)
+DASHBOARD_DIR = Path(os.environ.get("AXIS_DASHBOARD_DIR", str(BASE_DIR / "dashboard")))
 DB_PATH = Path(os.environ.get("AXIS_DB_PATH", str(DATA_DIR / "transactions.db")))
 WHATSAPP_NUM = os.environ.get("WHATSAPP_NUM", "")
 WHATSAPP_ENABLED = os.environ.get("OPENCLAW_WHATSAPP_ENABLED", "true").lower() in {
@@ -305,8 +303,97 @@ def build_source_id(env_id, tx_date, amount, tx_type, particulars, account):
     return "hash:" + hashlib.sha256(raw.encode()).hexdigest()
 
 
-def fetch_recent_transactions(days=7):
-    print(f"📧 Fetching Axis Bank emails from last {days} days...")
+def get_fetch_plan(conn, days):
+    now = datetime.now()
+    requested_start = now - timedelta(days=days)
+
+    stats = conn.execute(
+        """
+        SELECT
+            MIN(CASE WHEN tx_date >= ? THEN tx_date END) AS min_in_window,
+            MAX(CASE WHEN tx_date >= ? THEN tx_date END) AS max_in_window,
+            MAX(tx_date) AS latest_overall
+        FROM transactions
+        """,
+        (requested_start.isoformat(), requested_start.isoformat()),
+    ).fetchone()
+
+    min_in_window = (
+        datetime.fromisoformat(stats["min_in_window"])
+        if stats["min_in_window"]
+        else None
+    )
+    latest_overall = (
+        datetime.fromisoformat(stats["latest_overall"])
+        if stats["latest_overall"]
+        else None
+    )
+
+    if min_in_window is None:
+        fetch_cutoff = requested_start
+        reason = "no_db_rows_for_requested_window"
+    elif min_in_window > requested_start + timedelta(minutes=1):
+        fetch_cutoff = requested_start
+        reason = "backfill_requested_window_start"
+    elif latest_overall is not None:
+        # Small overlap keeps the sync safe if the last run stopped mid-way.
+        fetch_cutoff = latest_overall - timedelta(days=1)
+        reason = "only_fetch_newer_than_latest_db_row"
+    else:
+        fetch_cutoff = requested_start
+        reason = "fallback_requested_window"
+
+    if fetch_cutoff < requested_start:
+        fetch_cutoff = requested_start
+
+    return {
+        "requested_start": requested_start,
+        "fetch_cutoff": fetch_cutoff,
+        "reason": reason,
+    }
+
+
+def describe_fetch_plan(plan):
+    requested_start = plan["requested_start"].strftime("%d %b %Y %H:%M")
+    fetch_cutoff = plan["fetch_cutoff"].strftime("%d %b %Y %H:%M")
+    reason = plan["reason"]
+
+    if reason == "no_db_rows_for_requested_window":
+        return (
+            f"ℹ️  DB has no rows for the requested window. "
+            f"Backfilling from {fetch_cutoff}."
+        )
+    if reason == "backfill_requested_window_start":
+        return (
+            f"ℹ️  DB only partially covers the requested window starting {requested_start}. "
+            f"Backfilling from {fetch_cutoff}."
+        )
+    if reason == "only_fetch_newer_than_latest_db_row":
+        return (
+            f"ℹ️  DB already covers the requested window. "
+            f"Only checking for newer mail from {fetch_cutoff} onward."
+        )
+    return f"ℹ️  Fetch plan: requesting data from {fetch_cutoff}."
+
+
+def get_existing_source_ids(conn, source_ids):
+    if not source_ids:
+        return set()
+    placeholders = ",".join("?" for _ in source_ids)
+    rows = conn.execute(
+        f"SELECT source_id FROM transactions WHERE source_id IN ({placeholders})",
+        list(source_ids),
+    ).fetchall()
+    return {row["source_id"] for row in rows}
+
+
+def fetch_recent_transactions(conn, days=7):
+    plan = get_fetch_plan(conn, days)
+    print(describe_fetch_plan(plan))
+    print(
+        f"📧 Fetching Axis Bank emails from {plan['fetch_cutoff'].strftime('%d %b %Y %H:%M')} "
+        f"because {plan['reason']}..."
+    )
     result = subprocess.run(
         ["himalaya", "--output", "json", "envelope", "list", "--page-size", "500"],
         capture_output=True,
@@ -318,8 +405,8 @@ def fetch_recent_transactions(days=7):
         print("❌ Failed to parse himalaya output")
         return []
 
-    cutoff = datetime.now() - timedelta(days=days)
     transactions = []
+    candidate_envs = []
 
     for env in envelopes:
         from_addr = env.get("from", {}).get("addr", "")
@@ -346,9 +433,22 @@ def fetch_recent_transactions(days=7):
         except Exception:
             tx_date = datetime.now()
 
-        if tx_date < cutoff:
+        if tx_date < plan["fetch_cutoff"]:
             continue
 
+        env_id = env.get("id")
+        source_id = f"msg:{env_id}" if env_id else None
+        candidate_envs.append((env, tx_date, amount, tx_type, source_id))
+
+    existing_ids = get_existing_source_ids(
+        conn, [source_id for _, _, _, _, source_id in candidate_envs if source_id]
+    )
+
+    for env, tx_date, amount, tx_type, source_id in candidate_envs:
+        if source_id and source_id in existing_ids:
+            continue
+
+        subject = env.get("subject", "")
         acc_match = re.search(r"XX(\d+)", subject)
         account = f"XX{acc_match.group(1)}" if acc_match else "Unknown"
 
@@ -381,7 +481,10 @@ def fetch_recent_transactions(days=7):
             }
         )
 
-    print(f"✅ Found {len(transactions)} recent transactions")
+    print(
+        f"✅ Found {len(candidate_envs)} candidate envelopes, "
+        f"{len(existing_ids)} already in DB, {len(transactions)} new transactions"
+    )
     return sorted(transactions, key=lambda tx: tx["date"], reverse=True)
 
 
@@ -1081,7 +1184,7 @@ _{period_label}_
             ],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=30,
         )
         if result.returncode == 0:
             print("✅ WhatsApp message sent!")
@@ -1160,7 +1263,7 @@ def main(days=7):
     conn = get_db()
     init_db(conn)
 
-    recent_transactions = fetch_recent_transactions(days=days)
+    recent_transactions = fetch_recent_transactions(conn, days=days)
     inserted = store_transactions(conn, recent_transactions)
     print(f"💾 Inserted {inserted} new transactions into {DB_PATH}")
 
