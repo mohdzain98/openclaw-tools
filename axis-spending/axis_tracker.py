@@ -110,6 +110,8 @@ CATEGORY_RULES = {
         r"hammad",
         r"sultan",
         r"tiffans",
+        r"amanali anwar",
+        r"brahmalingeshwara",
     ],
     "transport": [
         r"\bbmtc\b",
@@ -490,7 +492,9 @@ def fetch_recent_transactions(conn, days=7):
 
         merchant = pick_payee(particulars) or particulars[:40]
         category = categorize_by_rules(merchant, particulars)
-        source_id = build_source_id(env.get("id"), tx_date, amount, tx_type, particulars, account)
+        source_id = build_source_id(
+            env.get("id"), tx_date, amount, tx_type, particulars, account
+        )
 
         transactions.append(
             {
@@ -625,6 +629,7 @@ def build_nav_links(month_keys):
 def compute_summary(transactions):
     debits = [tx for tx in transactions if tx["type"] == "Debit"]
     credits = [tx for tx in transactions if tx["type"] == "Credit"]
+    total_debit = sum(tx["amount"] for tx in debits)
 
     category_map = defaultdict(
         lambda: {"debit": 0.0, "credit": 0.0, "net": 0.0, "count": 0}
@@ -646,10 +651,22 @@ def compute_summary(transactions):
                 "debit": values["debit"],
                 "credit": values["credit"],
                 "net": values["net"],
+                "share_of_debit": (
+                    (values["debit"] / total_debit) * 100 if total_debit > 0 else 0.0
+                ),
                 "count": values["count"],
             }
         )
     category_rows.sort(key=lambda row: (row["debit"] + row["credit"]), reverse=True)
+
+    spend_category_candidates = [
+        row for row in category_rows if row["debit"] > 0 and row["category"] != "home"
+    ]
+    top_spend_category = (
+        max(spend_category_candidates, key=lambda row: row["debit"])
+        if spend_category_candidates
+        else None
+    )
 
     target_rows_by_category = {}
     for category in sorted({tx["category"] for tx in transactions}):
@@ -680,11 +697,12 @@ def compute_summary(transactions):
         target_rows_by_category[category] = target_rows
 
     return {
-        "total_spent": sum(tx["amount"] for tx in debits),
+        "total_spent": total_debit,
         "total_credited": sum(tx["amount"] for tx in credits),
         "tx_count": len(transactions),
         "debit_count": len(debits),
         "credit_count": len(credits),
+        "top_spend_category": top_spend_category,
         "category_rows": category_rows,
         "target_rows_by_category": target_rows_by_category,
         "transactions": transactions,
@@ -695,6 +713,7 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
     category_rows = summary["category_rows"]
     target_rows_by_category = summary["target_rows_by_category"]
     transactions = summary["transactions"]
+    top_spend_category = summary["top_spend_category"]
     default_category = (
         max(category_rows, key=lambda row: row["debit"])["category"]
         if category_rows
@@ -736,13 +755,12 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
     category_table_html = ""
     for row in category_rows:
         color = cat_colors.get(row["category"], "#94A3B8")
-        net_class = "amt-credit" if row["net"] >= 0 else "amt-debit"
         category_table_html += f"""
         <tr>
           <td><span class="tag" style="background:{color}20;color:{color};border:1px solid {color}40">{row['category']}</span></td>
           <td class="td-amt amt-debit">₹{row['debit']:,.0f}</td>
           <td class="td-amt amt-credit">₹{row['credit']:,.0f}</td>
-          <td class="td-amt {net_class}">₹{row['net']:,.0f}</td>
+          <td class="td-amt">{row['share_of_debit']:.1f}%</td>
           <td class="td-amt">{row['count']}</td>
         </tr>"""
 
@@ -802,7 +820,14 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
           <td class="td-amt {amt_class}">{sign}₹{tx['amount']:,.0f}</td>
         </tr>"""
 
-    net_flow = summary["total_credited"] - summary["total_spent"]
+    top_spend_category_name = (
+        top_spend_category["category"].replace("_", " ").title()
+        if top_spend_category
+        else "—"
+    )
+    top_spend_category_value = (
+        f"₹{top_spend_category['debit']:,.0f}" if top_spend_category else "No debit rows"
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -967,19 +992,23 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
   thead tr {{ border-bottom: 1px solid var(--border); }}
   th {{
     text-align: left;
-    padding: 0 0 12px;
+    padding: 0 12px 12px 12px;
     font-size: 10px;
     letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--muted);
     font-family: 'JetBrains Mono', monospace;
   }}
+  th:first-child {{ padding-left: 0; }}
+  th:last-child {{ padding-right: 0; }}
   td {{
-    padding: 12px 0;
+    padding: 12px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     font-size: 13px;
     vertical-align: middle;
   }}
+  td:first-child {{ padding-left: 0; }}
+  td:last-child {{ padding-right: 0; }}
   tr:last-child td {{ border-bottom: none; }}
   .td-date {{
     color: var(--muted);
@@ -994,7 +1023,7 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
   }}
   .td-merchant {{
     color: var(--text);
-    padding: 0 12px;
+    padding: 0 16px;
     max-width: 260px;
     overflow: hidden;
     white-space: nowrap;
@@ -1014,6 +1043,24 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
     border-radius: 4px;
     font-family: 'JetBrains Mono', monospace;
     white-space: nowrap;
+  }}
+  @media (max-width: 640px) {{
+    th {{
+      padding: 0 10px 10px 10px;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+    }}
+    td {{
+      padding: 12px 10px;
+      font-size: 12px;
+    }}
+    .td-merchant {{
+      padding: 0 14px;
+      max-width: 180px;
+    }}
+    .td-amt {{
+      min-width: 76px;
+    }}
   }}
   .empty-state {{
     color: var(--muted);
@@ -1055,9 +1102,9 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
       <div class="stat-sub">{summary['credit_count']} credit transactions</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Net Flow</div>
-      <div class="stat-value">₹{net_flow:,.0f}</div>
-      <div class="stat-sub">credit minus debit</div>
+      <div class="stat-label">Top Spend Category</div>
+      <div class="stat-value">{top_spend_category_name}</div>
+      <div class="stat-sub">{top_spend_category_value}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Categories</div>
@@ -1075,7 +1122,7 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
             <th>Category</th>
             <th style="text-align:right">Debit</th>
             <th style="text-align:right">Credit</th>
-            <th style="text-align:right">Net</th>
+            <th style="text-align:right">Share</th>
             <th style="text-align:right">Txns</th>
           </tr>
         </thead>
