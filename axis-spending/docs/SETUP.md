@@ -1,6 +1,6 @@
-# OpenClaw Weekly Spending Tracker — Complete Setup Guide
+# Axis Spending — Setup Guide
 
-> Automatically fetches Axis Bank transaction emails, categorizes spending, generates an HTML dashboard, and sends a weekly WhatsApp summary via OpenClaw.
+> Template setup guide for an OpenClaw-compatible spending tracker built on top of email alerts, SQLite, and generated dashboards.
 
 ---
 
@@ -41,7 +41,7 @@ OpenClaw sends WhatsApp summary with dashboard link
 
 ## Step 2: Install Himalaya on the Server
 
-SSH into your prod server and run:
+Run on your server:
 
 ```bash
 # Check latest version
@@ -65,7 +65,7 @@ mkdir -p ~/.config/himalaya
 nano ~/.config/himalaya/config.toml
 ```
 
-Paste this config (replace with your actual Gmail and app password):
+Paste this config and replace the placeholder values:
 
 ```toml
 [accounts.axis-inbox]
@@ -216,11 +216,7 @@ Dashboard URLs:
 ## Step 9: Test WhatsApp Sending
 
 ```bash
-# Test OpenClaw WhatsApp sending directly
-openclaw message send --channel whatsapp --target 917310672019 --message "test from openclaw"
-
-# Expected output:
-# ✅ Sent via gateway (whatsapp). Message ID: 3EB0059026BB58CC7EF69A
+openclaw message send --channel whatsapp --target +910000000000 --message "test from openclaw"
 ```
 ---
 
