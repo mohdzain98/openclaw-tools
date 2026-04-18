@@ -26,6 +26,7 @@ jobs:
             mkdir -p /home/zain/zainclaw/axis_spending
             mkdir -p /home/zain/zainclaw/axis_spending/data
             mkdir -p /home/zain/zainclaw/axis_spending/dashboard
+            mkdir -p /tmp/axis-spending-deploy
 
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
@@ -34,14 +35,18 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "axis-spending/axis_tracker.py,axis-spending/SKILL.md"
-          target: "/home/zain/zainclaw/axis_spending"
+          target: "/tmp/axis-spending-deploy"
           strip_components: 1
 
-      - name: Verify deployed tracker
+      - name: Install deployed files
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            cp /tmp/axis-spending-deploy/axis_tracker.py /home/zain/zainclaw/axis_spending/axis_tracker.py
+            cp /tmp/axis-spending-deploy/SKILL.md /home/zain/zainclaw/axis_spending/SKILL.md
             python3 -m py_compile /home/zain/zainclaw/axis_spending/axis_tracker.py
+            rm -f /tmp/axis-spending-deploy/axis_tracker.py
+            rm -f /tmp/axis-spending-deploy/SKILL.md
