@@ -70,7 +70,7 @@ Paste this config (replace with your actual Gmail and app password):
 ```toml
 [accounts.axis-inbox]
 email = "youremail@gmail.com"
-display-name = "Zain"
+display-name = "name"
 default = true
 
 backend.type = "imap"
@@ -110,21 +110,20 @@ Transaction Info: UPI/P2M/737295712717/BANGALORE METRO
 
 ### 4.1 Create directory on server
 ```bash
-mkdir -p /home/zain/zainclaw/axis_spending
+mkdir -p /pathto/axis_spending
 ```
 
 ### 4.2 Create the tracker script
-Place `axis_tracker.py` in `/home/zain/zainclaw/axis_spending/`
+Place `axis_tracker.py` in `/pathto/axis_spending/`
 
 ### 4.3 Create SKILL.md
-Place `SKILL.md` in `/home/zain/zainclaw/axis_spending/`
+Place `SKILL.md` in `/pathto/axis_spending/`
 
 SKILL.md frontmatter:
 ```yaml
 ---
 name: axis-spending
 description: "Fetches Axis Bank transaction emails via Himalaya, categorizes spending using keyword rules + OpenAI/Gemini fallback, generates a weekly HTML dashboard, and sends a WhatsApp summary."
-homepage: https://github.com/mohdzain/axis-spending
 metadata: {"clawdbot":{"emoji":"💸","requires":{"bins":["himalaya","python3"]}}}
 ---
 ```
@@ -142,16 +141,16 @@ pip install requests openpyxl --break-system-packages
 ## Step 6: Set Environment Variables
 create .env
 ```bash
-nano /home/zain/zainclaw/axis_spending/.env
+nano /pathto/axis_spending/.env
 ```
 
 ```bash
 WHATSAPP_NUM=+910000000000
-DASHBOARD_URL=https://claw.mohdzain.com/spending
+DASHBOARD_URL=https://your-domain.example/spending
 AXIS_SENDER=alerts@axis.bank.in
-AXIS_DATA_DIR=/home/zain/zainclaw/axis_spending/data
-AXIS_DASHBOARD_DIR=/home/zain/zainclaw/axis_spending/dashboard
-AXIS_DB_PATH=/home/zain/zainclaw/axis_spending/data/transactions.db
+AXIS_DATA_DIR=/path/to/axis_spending/data
+AXIS_DASHBOARD_DIR=/path/to/axis_spending/dashboard
+AXIS_DB_PATH=/path/to/axis_spending/data/transactions.db
 OPENCLAW_WHATSAPP_ENABLED=true
 AXIS_DEFAULT_FETCH_DAYS=7
 AXIS_LATEST_DASHBOARD_DAYS=7
@@ -165,7 +164,7 @@ AXIS_LATEST_DASHBOARD_DAYS=7
 
 ```bash
 # Tell OpenClaw where your custom skills live
-openclaw config set skills.load.extraDirs '["/home/zain/zainclaw/axis_spending"]'
+openclaw config set skills.load.extraDirs '["/path/to/axis_spending"]'
 
 # Restart gateway to pick up the new skill
 openclaw gateway restart
@@ -189,10 +188,10 @@ Example:
 
 ```nginx
 server {
-    server_name claw.mohdzain.com;
+    server_name your-domain.example;
 
     location /spending/ {
-        alias /home/zain/zainclaw/axis_spending/dashboard/;
+        alias /path/to/axis_spending/dashboard/;
         index latest.html;
         try_files $uri $uri/ /latest.html;
         add_header Cache-Control "no-cache";
@@ -207,10 +206,10 @@ sudo systemctl reload nginx
 ```
 
 Dashboard URLs:
-- `https://claw.mohdzain.com/spending/latest.html`
-- `https://claw.mohdzain.com/spending/current-month.html`
-- `https://claw.mohdzain.com/spending/all-time.html`
-- `https://claw.mohdzain.com/spending/archive.html`
+- `https://your-domain.example/spending/latest.html`
+- `https://your-domain.example/spending/current-month.html`
+- `https://your-domain.example/spending/all-time.html`
+- `https://your-domain.example/spending/archive.html`
 
 ---
 
@@ -228,7 +227,7 @@ openclaw message send --channel whatsapp --target 917310672019 --message "test f
 ## Step 10: Test Full Script
 
 ```bash
-python3 /home/zain/zainclaw/axis_spending/axis_tracker.py
+python3 /path/to/axis_spending/axis_tracker.py
 ```
 
 What happens:
@@ -261,14 +260,14 @@ Expected output:
    medical         ₹840.00
    recharge        ₹249.00
 
-📊 Dashboard saved: /home/zain/zainclaw/axis_spending/dashboard/week-2026-04-15.html
+📊 Dashboard saved: /path/to/axis_spending/dashboard/week-2026-04-15.html
 ✅ WhatsApp message sent!
 
 Dashboard: 
-https://claw.mohdzain.com/spending/latest.html
-https://claw.mohdzain.com/spending/current-month.html
-https://claw.mohdzain.com/spending/all-time.html
-https://claw.mohdzain.com/spending/archive.html
+https://your-domain.example/spending/latest.html
+https://your-domain.example/spending/current-month.html
+https://your-domain.example/spending/all-time.html
+https://your-domain.example/spending/archive.html
 ```
 
 ---
@@ -278,7 +277,7 @@ https://claw.mohdzain.com/spending/archive.html
 To run every Monday `12:00 AM IST`, use:
 
 ```cron
-30 18 * * 0 /usr/bin/python3 /home/zain/zainclaw/axis_spending/axis_tracker.py 7 >> /var/log/axis_tracker.log 2>&1
+30 18 * * 0 /usr/bin/python3 /path/to/axis_spending/axis_tracker.py 7 >> /var/log/axis_tracker.log 2>&1
 ```
 
 Why:

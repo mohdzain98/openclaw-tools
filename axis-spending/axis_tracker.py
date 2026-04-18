@@ -37,9 +37,7 @@ BASE_DIR = Path(__file__).resolve().parent
 load_env_file(BASE_DIR / ".env")
 
 SENDER = os.environ.get("AXIS_SENDER", "alerts@axis.bank.in")
-DASHBOARD_URL = os.environ.get(
-    "DASHBOARD_URL", "https://claw.mohdzain.com/spending"
-).rstrip("/")
+DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "").rstrip("/")
 DATA_DIR = Path(os.environ.get("AXIS_DATA_DIR", str(BASE_DIR / "data")))
 DASHBOARD_DIR = Path(os.environ.get("AXIS_DASHBOARD_DIR", str(BASE_DIR / "dashboard")))
 DB_PATH = Path(os.environ.get("AXIS_DB_PATH", str(DATA_DIR / "transactions.db")))
@@ -826,7 +824,9 @@ def generate_dashboard(summary, period_label, page_title, nav_links):
         else "—"
     )
     top_spend_category_value = (
-        f"₹{top_spend_category['debit']:,.0f}" if top_spend_category else "No debit rows"
+        f"₹{top_spend_category['debit']:,.0f}"
+        if top_spend_category
+        else "No debit rows"
     )
 
     return f"""<!DOCTYPE html>

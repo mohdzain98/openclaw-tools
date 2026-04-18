@@ -39,7 +39,7 @@ Generated outputs:
 Expected server path:
 
 ```text
-/home/zain/zainclaw/axis_spending/
+/path/to/axis_spending/
   axis_tracker.py
   SKILL.md
   .env
@@ -128,15 +128,15 @@ You should be able to see mailbox envelopes, including Axis alert emails.
 Make sure these files exist on the server:
 
 ```bash
-/home/zain/zainclaw/axis_spending/axis_tracker.py
-/home/zain/zainclaw/axis_spending/SKILL.md
+/path/to/axis_spending/axis_tracker.py
+/path/to/axis_spending/SKILL.md
 ```
 
 Create data and dashboard folders:
 
 ```bash
-mkdir -p /home/zain/zainclaw/axis_spending/data
-mkdir -p /home/zain/zainclaw/axis_spending/dashboard
+mkdir -p /path/to/axis_spending/data
+mkdir -p /path/to/axis_spending/dashboard
 ```
 
 ## Step 4: Create `.env`
@@ -144,18 +144,18 @@ mkdir -p /home/zain/zainclaw/axis_spending/dashboard
 Create:
 
 ```bash
-nano /home/zain/zainclaw/axis_spending/.env
+nano /path/to/axis_spending/.env
 ```
 
 Recommended contents:
 
 ```env
-WHATSAPP_NUM=+917310672019
-DASHBOARD_URL=https://claw.mohdzain.com/spending
+WHATSAPP_NUM=+910000000000
+DASHBOARD_URL=https://your-domain.example/spending
 AXIS_SENDER=alerts@axis.bank.in
-AXIS_DATA_DIR=/home/zain/zainclaw/axis_spending/data
-AXIS_DASHBOARD_DIR=/home/zain/zainclaw/axis_spending/dashboard
-AXIS_DB_PATH=/home/zain/zainclaw/axis_spending/data/transactions.db
+AXIS_DATA_DIR=/path/to/axis_spending/data
+AXIS_DASHBOARD_DIR=/path/to/axis_spending/dashboard
+AXIS_DB_PATH=/path/to/axis_spending/data/transactions.db
 OPENCLAW_WHATSAPP_ENABLED=true
 AXIS_DEFAULT_FETCH_DAYS=7
 AXIS_LATEST_DASHBOARD_DAYS=7
@@ -168,17 +168,17 @@ Notes:
 
 ## Step 5: nginx Configuration
 
-If OpenClaw is already proxied on `claw.mohdzain.com`, add a static location for
+If OpenClaw is already proxied on your domain, add a static location for
 the dashboards before the catch-all `/` proxy block.
 
 Example:
 
 ```nginx
 server {
-    server_name claw.mohdzain.com;
+    server_name your-domain.example;
 
     location /spending/ {
-        alias /home/zain/zainclaw/axis_spending/dashboard/;
+        alias /path/to/axis_spending/dashboard/;
         index latest.html;
         try_files $uri $uri/ /latest.html;
         add_header Cache-Control "no-cache";
@@ -203,23 +203,23 @@ sudo systemctl reload nginx
 ```
 
 Dashboard URLs:
-- `https://claw.mohdzain.com/spending/latest.html`
-- `https://claw.mohdzain.com/spending/current-month.html`
-- `https://claw.mohdzain.com/spending/all-time.html`
-- `https://claw.mohdzain.com/spending/archive.html`
+- `https://your-domain.example/spending/latest.html`
+- `https://your-domain.example/spending/current-month.html`
+- `https://your-domain.example/spending/all-time.html`
+- `https://your-domain.example/spending/archive.html`
 
 ## Step 6: Test Manually
 
 Run:
 
 ```bash
-python3 /home/zain/zainclaw/axis_spending/axis_tracker.py
+python3 /path/to/axis_spending/axis_tracker.py
 ```
 
 Or with an explicit sync window:
 
 ```bash
-python3 /home/zain/zainclaw/axis_spending/axis_tracker.py 14
+python3 /path/to/axis_spending/axis_tracker.py 14
 ```
 
 What happens:
@@ -237,7 +237,7 @@ Useful first-run note:
 To run every Monday `12:00 AM IST`, use:
 
 ```cron
-30 18 * * 0 /usr/bin/python3 /home/zain/zainclaw/axis_spending/axis_tracker.py 7 >> /var/log/axis_tracker.log 2>&1
+30 18 * * 0 /usr/bin/python3 /path/to/axis_spending/axis_tracker.py 7 >> /var/log/axis_tracker.log 2>&1
 ```
 
 Why:
@@ -271,7 +271,7 @@ It describes:
 ### WhatsApp number missing
 
 Make sure:
-- `/home/zain/zainclaw/axis_spending/.env` exists
+- `/path/to/axis_spending/.env` exists
 - `WHATSAPP_NUM=...` is present
 
 ### `openclaw` command not found
@@ -296,7 +296,7 @@ Quick month summary:
 ```bash
 python3 - <<'PY'
 import sqlite3
-conn = sqlite3.connect('/home/zain/zainclaw/axis_spending/data/transactions.db')
+conn = sqlite3.connect('/path/to/axis_spending/data/transactions.db')
 for row in conn.execute("select substr(tx_date,1,7) as month, count(*) from transactions group by 1 order by 1 desc"):
     print(row)
 conn.close()
@@ -310,7 +310,7 @@ This repo includes a GitHub Actions deploy workflow for `axis-spending`.
 It copies the tool files to:
 
 ```text
-/home/zain/zainclaw/axis_spending
+/path/to/axis_spending
 ```
 
 Required GitHub secrets:

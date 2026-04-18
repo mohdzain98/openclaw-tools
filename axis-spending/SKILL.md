@@ -1,7 +1,6 @@
 ---
 name: axis-spending
 description: "Fetches Axis Bank transaction emails via Himalaya, categorizes them using notebook-style regex rules, stores them in SQLite, generates weekly and monthly dashboards from stored history, and sends a WhatsApp summary. Use when asked about weekly spending reports, category summaries, or transaction analysis."
-homepage: https://github.com/mohdzain/axis-spending
 metadata: {"clawdbot":{"emoji":"💸","requires":{"bins":["himalaya","python3"]}}}
 ---
 
