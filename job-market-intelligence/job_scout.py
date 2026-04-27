@@ -7,6 +7,7 @@ Job Market Intelligence Agent
 - Sends WhatsApp summary via OpenClaw
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -46,6 +47,7 @@ WHATSAPP_ENABLED = os.environ.get("OPENCLAW_WHATSAPP_ENABLED", "true").lower() i
     "on",
 }
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "/home/zain/.local/bin/claude")
+CODEX_BIN = os.environ.get("CODEX_BIN", "/home/zain/.npm-global/bin/codex")
 PROMPT_FILE = Path(os.environ.get("JOBS_PROMPT_FILE", str(BASE_DIR / "prompt.txt")))
 
 JOB_ROLES_RAW = os.environ.get(
@@ -201,9 +203,9 @@ def load_jobs(conn, since_date=None):
 # ── CLAUDE SEARCH ─────────────────────────────────────────────────────────────
 
 
-def run_claude(prompt):
+def run_claude(prompt, timeout=600):
     print("🤖 Running Claude CLI with WebSearch...")
-    result = subprocess.run(
+    proc = subprocess.Popen(
         [
             CLAUDE_BIN,
             "--print",
@@ -214,19 +216,55 @@ def run_claude(prompt):
             "-p",
             prompt,
         ],
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=900,
     )
-    if result.returncode != 0:
-        print(f"❌ Claude CLI failed: {result.stderr[:300]}")
+
+    lines = []
+    timed_out = False
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        lines = [stdout]
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stdout, stderr = proc.communicate()
+        # capture whatever Claude flushed before the kill
+        lines = [stdout] if stdout else []
+        timed_out = True
+
+    output = "".join(lines).strip()
+
+    if timed_out:
+        print(
+            f"⚠️  Claude timed out after {timeout}s — using partial output ({len(output)} chars)"
+        )
+    elif proc.returncode != 0:
+        print(f"❌ Claude CLI failed: {stderr[:300]}")
         sys.exit(1)
-    output = result.stdout.strip()
-    print(f"✅ Claude completed ({len(output)} chars)")
+    else:
+        print(f"✅ Claude completed ({len(output)} chars)")
+
     return output
 
 
-def search_jobs():
+def run_codex(prompt):
+    print("🧠 Running Codex CLI...")
+    result = subprocess.run(
+        [CODEX_BIN, "--full-auto", "--search", "exec", prompt],
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    if result.returncode != 0:
+        print(f"❌ Codex failed: {result.stderr[:300]}")
+        sys.exit(1)
+    output = result.stdout.strip()
+    print(f"✅ Codex completed ({len(output)} chars)")
+    return output
+
+
+def search_jobs(model="claude"):
     if not PROMPT_FILE.exists():
         print(f"❌ Prompt file not found: {PROMPT_FILE}")
         sys.exit(1)
@@ -242,7 +280,7 @@ def search_jobs():
         .replace("[LOCATIONS]", ", ".join(SEARCH_LOCATIONS))
     )
 
-    output = run_claude(prompt)
+    output = run_codex(prompt) if model == "codex" else run_claude(prompt)
 
     # Strip markdown fences if present
     output = re.sub(r"```(?:json)?", "", output).strip()
@@ -729,17 +767,30 @@ def send_whatsapp(new_jobs, run_date):
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Job Market Intelligence Agent")
+    parser.add_argument(
+        "-m",
+        "--model",
+        choices=["claude", "codex"],
+        default="claude",
+        help="LLM to use (default: claude)",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
     run_date = datetime.now().strftime("%d %b %Y")
-    print(f"\n🚀 Job Scout — {run_date}")
+    print(f"\n🚀 Job Scout — {run_date} [{args.model}]")
     print("=" * 50)
 
     conn = get_db()
     init_db(conn)
 
-    # 1. Search + extract via Claude CLI
-    raw_jobs = search_jobs()
-    print(f"   Claude found: {len(raw_jobs)} candidate jobs")
+    # 1. Search + extract via chosen LLM
+    raw_jobs = search_jobs(model=args.model)
+    print(f"   {args.model.title()} found: {len(raw_jobs)} candidate jobs")
 
     # 3. Process (validate + score + local dedup)
     processed = process_jobs(raw_jobs)
