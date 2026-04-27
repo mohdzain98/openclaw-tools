@@ -1,0 +1,55 @@
+name: Deploy Job Scout
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "job-market-intelligence/job_scout.py"
+      - "job-market-intelligence/SKILL.md"
+      - "job-market-intelligence/prompt.txt"
+      - ".github/workflows/deploy-job-scout.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare server directories
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /home/zain/zainclaw/job_scout
+            mkdir -p /home/zain/zainclaw/job_scout/data
+            mkdir -p /home/zain/zainclaw/job_scout/dashboard
+            mkdir -p /tmp/job-scout-deploy
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "job-market-intelligence/job_scout.py,job-market-intelligence/SKILL.md,job-market-intelligence/prompt.txt"
+          target: "/tmp/job-scout-deploy"
+          strip_components: 1
+
+      - name: Install deployed files
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cp /tmp/job-scout-deploy/job_scout.py /home/zain/zainclaw/job_scout/job_scout.py
+            cp /tmp/job-scout-deploy/SKILL.md     /home/zain/zainclaw/job_scout/SKILL.md
+            cp /tmp/job-scout-deploy/prompt.txt   /home/zain/zainclaw/job_scout/prompt.txt
+            python3 -m py_compile /home/zain/zainclaw/job_scout/job_scout.py
+            rm -f /tmp/job-scout-deploy/job_scout.py
+            rm -f /tmp/job-scout-deploy/SKILL.md
+            rm -f /tmp/job-scout-deploy/prompt.txt
