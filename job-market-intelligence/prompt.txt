@@ -3,6 +3,11 @@ Today is [DATE]. You are a job scout. Use WebSearch to find job postings for the
 Roles to search: [ROLES]
 Locations: [LOCATIONS] (India)
 
+Candidate profile:
+- 2–3 years of experience in Data Science or AI/ML
+- NOT a fresher, entry-level, or campus hire role
+- Looking for mid-level individual contributor positions
+
 Search LinkedIn, Naukri, Glassdoor, Indeed, and company career pages. Run multiple searches covering different role+location combinations.
 
 Return ONLY a JSON array (no explanation, no markdown). Each object must have exactly these fields:
@@ -16,5 +21,8 @@ Return ONLY a JSON array (no explanation, no markdown). Each object must have ex
 
 Rules:
 - Only include real job postings (skip news, blogs, general pages)
+- Skip roles that require 0–1 years experience, say "fresher", "trainee", "graduate", "campus", or "intern"
+- Skip roles that require 5+ years experience or are "Lead", "Principal", "Director", "VP", or "Head of"
 - Deduplicate by title + company
+- Return the top 10 most relevant and recently posted jobs only
 - Return ONLY the raw JSON array

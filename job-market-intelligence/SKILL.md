@@ -56,6 +56,11 @@ Data Scientist, Gen AI Engineer, ML Engineer, LLM Engineer, AI Researcher
 - Remote tag: +5 bonus
 - Max score: 100 · Top picks threshold: ≥ 75
 
+### Candidate profile filter
+- Target experience: 2–3 years (mid-level individual contributor)
+- Skips: fresher, trainee, intern, graduate, campus hire, 0–1 yr roles
+- Skips: Lead, Principal, Director, VP, Head of (5+ yr roles)
+
 ### Notes
 - Runs automatically every other night at 12:00 AM IST via cron
 - `applied` status is tracked in the browser via localStorage (no backend needed)
