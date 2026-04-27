@@ -216,7 +216,7 @@ def run_claude(prompt):
         ],
         capture_output=True,
         text=True,
-        timeout=300,
+        timeout=900,
     )
     if result.returncode != 0:
         print(f"❌ Claude CLI failed: {result.stderr[:300]}")
